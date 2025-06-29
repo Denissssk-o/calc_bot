@@ -3,7 +3,7 @@ import os
 import httpx
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    Application,
+    ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     filters,
@@ -11,15 +11,16 @@ from telegram.ext import (
     ConversationHandler,
 )
 
+# Настройка логирования
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
+# Конфигурация
 TOKEN = os.getenv("BOT_TOKEN")
 APP_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-
 SERVICE_FEE = 2000
 CBR_API_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
 PRICE, BOX = range(2)
@@ -31,6 +32,7 @@ BOX_TYPES = {
     "XXL (две пары обуви и вещи)": {"size": "37×29×28 см", "delivery_price": 4000},
 }
 
+# Вспомогательные функции (без изменений)
 def get_box_keyboard():
     return ReplyKeyboardMarkup([[k] for k in BOX_TYPES.keys()], resize_keyboard=True, one_time_keyboard=True)
 
@@ -49,6 +51,7 @@ async def get_cny_rate() -> float:
         logger.error(f"Ошибка получения курса: {e}")
         return 12.5
 
+# Обработчики команд (без изменений)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     await update.message.reply_text(
@@ -113,9 +116,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-async def main():
-    app = Application.builder().token(TOKEN).build()
-
+# Запуск приложения (исправленная часть)
+if __name__ == "__main__":
+    # Создаем приложение
+    application = ApplicationBuilder().token(TOKEN).build()
+    
+    # Добавляем обработчики
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -124,25 +130,17 @@ async def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-
-    app.add_handler(conv_handler)
-
+    application.add_handler(conv_handler)
+    
+    # Настройки вебхука
     webhook_path = f"/webhook/{TOKEN}"
     webhook_url = f"{APP_URL}{webhook_path}"
-
-    # Устанавливаем webhook (один раз при запуске)
-    await app.bot.set_webhook(webhook_url)
-    logger.info(f"Webhook установлен: {webhook_url}")
-
-    # Запускаем вебхук сервер
-    await app.run_webhook(
-    listen="0.0.0.0",
-    port=int(os.environ.get("PORT", "8443")),
-    url_path=webhook_path,   # <- поменял webhook_path на url_path
-    webhook_url=webhook_url,
-)
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
+    port = int(os.environ.get("PORT", "8443"))
+    
+    # Запускаем приложение
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=webhook_path,
+        webhook_url=webhook_url
+    )
