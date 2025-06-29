@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: my-telegram-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8156633539:AAGXlHOFkDWztI_Fv6OXd6N2ql5vflnlbb4
+      - key: PORT
+        value: 10000
+      - key: WEBHOOK_SECRET
+        generateValue: true

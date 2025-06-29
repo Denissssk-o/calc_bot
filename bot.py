@@ -32,7 +32,6 @@ BOX_TYPES = {
     "XXL (две пары обуви и вещи)": {"size": "37×29×28 см", "delivery_price": 4000},
 }
 
-# Вспомогательные функции (без изменений)
 def get_box_keyboard():
     return ReplyKeyboardMarkup([[k] for k in BOX_TYPES.keys()], resize_keyboard=True, one_time_keyboard=True)
 
@@ -51,7 +50,6 @@ async def get_cny_rate() -> float:
         logger.error(f"Ошибка получения курса: {e}")
         return 12.5
 
-# Обработчики команд (без изменений)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     await update.message.reply_text(
@@ -116,12 +114,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-# Запуск приложения (исправленная часть)
 if __name__ == "__main__":
-    # Создаем приложение
+    # Инициализация приложения
     application = ApplicationBuilder().token(TOKEN).build()
     
-    # Добавляем обработчики
+    # Настройка обработчиков
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -132,15 +129,31 @@ if __name__ == "__main__":
     )
     application.add_handler(conv_handler)
     
-    # Настройки вебхука
+    # Конфигурация вебхука
     webhook_path = f"/webhook/{TOKEN}"
     webhook_url = f"{APP_URL}{webhook_path}"
     port = int(os.environ.get("PORT", "8443"))
     
-    # Запускаем приложение
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path=webhook_path,
-        webhook_url=webhook_url
-    )
+    # Проверка переменных окружения
+    if not TOKEN:
+        logger.error("Переменная BOT_TOKEN не установлена!")
+        exit(1)
+    
+    if not APP_URL:
+        logger.warning("RENDER_EXTERNAL_URL не установлен, используем polling")
+        application.run_polling()
+    else:
+        try:
+            # Запуск вебхука
+            logger.info(f"Запуск бота на порту {port} с вебхуком {webhook_url}")
+            application.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                url_path=webhook_path,
+                webhook_url=webhook_url,
+                secret_token=os.getenv("WEBHOOK_SECRET", "your-secret-token"),
+                drop_pending_updates=True
+            )
+        except Exception as e:
+            logger.error(f"Ошибка вебхука: {e}, переключаемся на polling")
+            application.run_polling()
