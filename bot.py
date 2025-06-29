@@ -1,8 +1,6 @@
 import logging
 import os
 import httpx
-import asyncio
-
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -20,42 +18,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен и URL из переменных окружения Render
+# Переменные окружения
 TOKEN = os.getenv("BOT_TOKEN")
-APP_URL = os.getenv("RENDER_EXTERNAL_URL").rstrip("/")
+APP_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+PORT = int(os.getenv("PORT", 8443))
 
 # Константы
 SERVICE_FEE = 2000
 CBR_API_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
-
 PRICE, BOX = range(2)
 
 BOX_TYPES = {
     "MINI (футболка, сумка, ремень, носки)": {
         "size": "23×17×13 см",
         "delivery_price": 1200,
-        "short": "MINI"
     },
     "SMALL (пара обуви в коробке)": {
         "size": "36×26×14 см",
         "delivery_price": 2000,
-        "short": "SMALL"
     },
     "LARGE (пара обуви и несколько вещей)": {
         "size": "40×29×16 см",
         "delivery_price": 2900,
-        "short": "LARGE"
     },
     "XXL (две пары обуви и вещи)": {
         "size": "37×29×28 см",
         "delivery_price": 4000,
-        "short": "XXL"
-    }
+    },
 }
 
 def get_box_keyboard():
     return ReplyKeyboardMarkup(
-        [[box_type] for box_type in BOX_TYPES.keys()],
+        [[box] for box in BOX_TYPES.keys()],
         resize_keyboard=True,
         one_time_keyboard=True
     )
@@ -73,7 +67,7 @@ async def get_cny_rate() -> float:
             return round(cny_rate, 2)
     except Exception as e:
         logger.error(f"Ошибка получения курса: {e}")
-        return 12.5  # запасной курс
+        return 12.5  # fallback
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
@@ -144,7 +138,19 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
+async def set_webhook(app: Application):
+    webhook_url = f"{APP_URL}/webhook/{TOKEN}"
+    try:
+        await app.bot.set_webhook(webhook_url)
+        logger.info(f"Webhook установлен: {webhook_url}")
+    except Exception as e:
+        logger.error(f"Ошибка установки webhook: {e}")
+
 def main():
+    if not TOKEN or not APP_URL:
+        logger.error("BOT_TOKEN и RENDER_EXTERNAL_URL должны быть заданы!")
+        return
+
     app = Application.builder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -155,21 +161,26 @@ def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
+
     app.add_handler(conv_handler)
 
-    async def run():
-        webhook_url = f"{APP_URL}/webhook/{TOKEN}"
-        await app.bot.set_webhook(webhook_url)
-        logger.info(f"Webhook установлен: {webhook_url}")
-        logger.info("Бот запущен через Webhook")
+    logger.info("Бот запускается с webhook")
 
+    import asyncio
+
+    async def runner():
+        await set_webhook(app)
         await app.run_webhook(
             listen="0.0.0.0",
-            port=int(os.environ.get("PORT", 8443)),
-            webhook_url=webhook_url,
+            port=PORT,
+            webhook_url=f"{APP_URL}/webhook/{TOKEN}",
+            drop_pending_updates=True,
         )
 
-    asyncio.run(run())
+    try:
+        asyncio.run(runner())
+    except Exception as e:
+        logger.error(f"Ошибка запуска webhook: {e}")
 
 if __name__ == "__main__":
     main()
