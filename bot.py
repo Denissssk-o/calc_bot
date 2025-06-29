@@ -1,7 +1,8 @@
 import logging
 import os
-import asyncio
 import httpx
+import asyncio
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -19,13 +20,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Получаем токен и URL из переменных окружения Render
+# Токен и URL из переменных окружения Render
 TOKEN = os.getenv("BOT_TOKEN")
 APP_URL = os.getenv("RENDER_EXTERNAL_URL").rstrip("/")
 
 # Константы
 SERVICE_FEE = 2000
 CBR_API_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
+
 PRICE, BOX = range(2)
 
 BOX_TYPES = {
@@ -71,7 +73,7 @@ async def get_cny_rate() -> float:
             return round(cny_rate, 2)
     except Exception as e:
         logger.error(f"Ошибка получения курса: {e}")
-        return 12.5
+        return 12.5  # запасной курс
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
@@ -142,14 +144,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-async def set_webhook(bot):
-    webhook_url = f"{APP_URL}/webhook/{TOKEN}"
-    try:
-        await bot.set_webhook(webhook_url)
-        logger.info(f"Webhook установлен: {webhook_url}")
-    except Exception as e:
-        logger.error(f"Ошибка установки webhook: {e}")
-
 def main():
     app = Application.builder().token(TOKEN).build()
 
@@ -163,15 +157,19 @@ def main():
     )
     app.add_handler(conv_handler)
 
-    # Установка webhook перед запуском бота
-    asyncio.run(set_webhook(app.bot))
+    async def run():
+        webhook_url = f"{APP_URL}/webhook/{TOKEN}"
+        await app.bot.set_webhook(webhook_url)
+        logger.info(f"Webhook установлен: {webhook_url}")
+        logger.info("Бот запущен через Webhook")
 
-    logger.info("Бот запущен через Webhook")
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8443)),
-        webhook_url=f"{APP_URL}/webhook/{TOKEN}",
-    )
+        await app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", 8443)),
+            webhook_url=webhook_url,
+        )
+
+    asyncio.run(run())
 
 if __name__ == "__main__":
     main()
