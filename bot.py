@@ -136,11 +136,11 @@ async def main():
 
     # Запускаем вебхук сервер
     await app.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", "8443")),
-        webhook_path=webhook_path,
-        webhook_url=webhook_url,
-    )
+    listen="0.0.0.0",
+    port=int(os.environ.get("PORT", "8443")),
+    url_path=webhook_path,   # <- поменял webhook_path на url_path
+    webhook_url=webhook_url,
+)
 
 if __name__ == "__main__":
     import asyncio
