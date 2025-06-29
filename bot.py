@@ -115,10 +115,16 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 if __name__ == "__main__":
+    if __name__ == "__main__":
+    # Проверка наличия обязательных переменных
+    if not TOKEN:
+        logger.error("❌ Ошибка: BOT_TOKEN не установлен!")
+        exit(1)
+    
     # Инициализация приложения
     application = ApplicationBuilder().token(TOKEN).build()
     
-    # Настройка обработчиков
+    # Добавление обработчиков
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -129,31 +135,22 @@ if __name__ == "__main__":
     )
     application.add_handler(conv_handler)
     
-    # Конфигурация вебхука
+    # Настройка вебхука
     webhook_path = f"/webhook/{TOKEN}"
     webhook_url = f"{APP_URL}{webhook_path}"
     port = int(os.environ.get("PORT", "8443"))
     
-    # Проверка переменных окружения
-    if not TOKEN:
-        logger.error("Переменная BOT_TOKEN не установлена!")
-        exit(1)
-    
-    if not APP_URL:
-        logger.warning("RENDER_EXTERNAL_URL не установлен, используем polling")
+    try:
+        logger.info("🔄 Попытка запуска через webhook...")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=webhook_url,
+            secret_token=os.getenv("WEBHOOK_SECRET", "default-secret"),
+            drop_pending_updates=True
+        )
+    except Exception as e:
+        logger.error(f"❌ Ошибка webhook: {e}")
+        logger.info("🔄 Переключаемся на polling...")
         application.run_polling()
-    else:
-        try:
-            # Запуск вебхука
-            logger.info(f"Запуск бота на порту {port} с вебхуком {webhook_url}")
-            application.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                url_path=webhook_path,
-                webhook_url=webhook_url,
-                secret_token=os.getenv("WEBHOOK_SECRET", "your-secret-token"),
-                drop_pending_updates=True
-            )
-        except Exception as e:
-            logger.error(f"Ошибка вебхука: {e}, переключаемся на polling")
-            application.run_polling()
