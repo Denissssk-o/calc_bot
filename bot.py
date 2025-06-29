@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 import httpx
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -18,9 +19,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Переменные окружения
+# Получаем токен и URL из переменных окружения Render
 TOKEN = os.getenv("BOT_TOKEN")
-APP_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+APP_URL = os.getenv("RENDER_EXTERNAL_URL").rstrip("/")
 
 # Константы
 SERVICE_FEE = 2000
@@ -141,11 +142,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-# Установка webhook
-async def set_webhook(application: Application):
+async def set_webhook(bot):
     webhook_url = f"{APP_URL}/webhook/{TOKEN}"
     try:
-        await application.bot.set_webhook(webhook_url)
+        await bot.set_webhook(webhook_url)
         logger.info(f"Webhook установлен: {webhook_url}")
     except Exception as e:
         logger.error(f"Ошибка установки webhook: {e}")
@@ -161,25 +161,18 @@ def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-
     app.add_handler(conv_handler)
 
+    # Установка webhook перед запуском бота
+    asyncio.run(set_webhook(app.bot))
+
     logger.info("Бот запущен через Webhook")
-
-    import asyncio
-
-    async def run():
-        await set_webhook(app)
-        await app.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.environ.get("PORT", 8443)),
-            webhook_url=f"{APP_URL}/webhook/{TOKEN}"
-        )
-
-    try:
-        asyncio.run(run())
-    except Exception as e:
-        logger.error(f"Ошибка запуска webhook: {e}")
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8443)),
+        webhook_path=f"/webhook/{TOKEN}",
+        webhook_url=f"{APP_URL}/webhook/{TOKEN}",
+    )
 
 if __name__ == "__main__":
     main()
