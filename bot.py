@@ -170,7 +170,6 @@ def main():
             listen="0.0.0.0",
             port=int(os.environ.get("PORT", 8443)),
             webhook_url=f"{APP_URL}/webhook/{TOKEN}",
-            webhook_url=f"{APP_URL}/webhook/{TOKEN}",
             on_startup=set_webhook
         )
     except Exception as e:
