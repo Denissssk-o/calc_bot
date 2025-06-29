@@ -169,7 +169,7 @@ def main():
         app.run_webhook(
             listen="0.0.0.0",
             port=int(os.environ.get("PORT", 8443)),
-            webhook_path=f"/webhook/{TOKEN}",
+            webhook_url=f"{APP_URL}/webhook/{TOKEN}",
             webhook_url=f"{APP_URL}/webhook/{TOKEN}",
             on_startup=set_webhook
         )
