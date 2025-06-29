@@ -18,9 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Получаем токен и URL из переменных окружения Render
+# Переменные окружения
 TOKEN = os.getenv("BOT_TOKEN")
-APP_URL = os.getenv("RENDER_EXTERNAL_URL").rstrip("/")
+APP_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
 
 # Константы
 SERVICE_FEE = 2000
@@ -165,13 +165,19 @@ def main():
     app.add_handler(conv_handler)
 
     logger.info("Бот запущен через Webhook")
-    try:
-        app.run_webhook(
+
+    import asyncio
+
+    async def run():
+        await set_webhook(app)
+        await app.run_webhook(
             listen="0.0.0.0",
             port=int(os.environ.get("PORT", 8443)),
-            webhook_url=f"{APP_URL}/webhook/{TOKEN}",
-            on_startup=set_webhook
+            webhook_url=f"{APP_URL}/webhook/{TOKEN}"
         )
+
+    try:
+        asyncio.run(run())
     except Exception as e:
         logger.error(f"Ошибка запуска webhook: {e}")
 
