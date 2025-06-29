@@ -1,6 +1,6 @@
 import logging
 import os
-import requests
+import httpx
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -62,11 +62,12 @@ def format_price(price: float) -> str:
 
 async def get_cny_rate() -> float:
     try:
-        response = requests.get(CBR_API_URL, timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        cny_rate = data['Valute']['CNY']['Value'] / data['Valute']['CNY']['Nominal']
-        return round(cny_rate, 2)
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(CBR_API_URL)
+            response.raise_for_status()
+            data = response.json()
+            cny_rate = data['Valute']['CNY']['Value'] / data['Valute']['CNY']['Nominal']
+            return round(cny_rate, 2)
     except Exception as e:
         logger.error(f"Ошибка получения курса: {e}")
         return 12.5
@@ -134,15 +135,20 @@ async def handle_box(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("❌ Отменено. Для нового расчета /start",
-                                    reply_markup=ReplyKeyboardMarkup([["/start"]], resize_keyboard=True))
+    await update.message.reply_text(
+        "❌ Отменено. Для нового расчета /start",
+        reply_markup=ReplyKeyboardMarkup([["/start"]], resize_keyboard=True)
+    )
     return ConversationHandler.END
 
-# ✅ Webhook: Устанавливаем ссылку при старте
+# Установка webhook
 async def set_webhook(application: Application):
     webhook_url = f"{APP_URL}/webhook/{TOKEN}"
-    await application.bot.set_webhook(webhook_url)
-    logger.info(f"Webhook установлен: {webhook_url}")
+    try:
+        await application.bot.set_webhook(webhook_url)
+        logger.info(f"Webhook установлен: {webhook_url}")
+    except Exception as e:
+        logger.error(f"Ошибка установки webhook: {e}")
 
 def main():
     app = Application.builder().token(TOKEN).build()
@@ -157,16 +163,18 @@ def main():
     )
 
     app.add_handler(conv_handler)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("cancel", cancel))
 
     logger.info("Бот запущен через Webhook")
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
-        webhook_path=f"/webhook/{TOKEN}",
-        on_startup=set_webhook
-    )
+    try:
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", 8443)),
+            webhook_path=f"/webhook/{TOKEN}",
+            webhook_url=f"{APP_URL}/webhook/{TOKEN}",
+            on_startup=set_webhook
+        )
+    except Exception as e:
+        logger.error(f"Ошибка запуска webhook: {e}")
 
 if __name__ == "__main__":
     main()
